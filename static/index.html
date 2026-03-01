@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Similarity Detector</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; max-width: 1100px; }
+    h1 { margin: 0 0 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    textarea { width: 100%; height: 220px; padding: 10px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px; }
+    button { padding: 10px 14px; border: 0; border-radius: 10px; cursor: pointer; font-weight: 600; }
+    .row { display: flex; gap: 10px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+    .card { border: 1px solid #eee; border-radius: 12px; padding: 12px; }
+    .kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .kpi div { padding: 10px; border: 1px solid #f0f0f0; border-radius: 10px; }
+    .muted { color: #666; font-size: 13px; }
+    mark { padding: 0 2px; border-radius: 4px; }
+    .preview { white-space: pre-wrap; line-height: 1.45; }
+    .small { font-size: 12px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>Similarity Detector (Jaccard + TF-IDF)</h1>
+  <p class="muted">Paste two texts, click Compare, then check the scores and the highlighted common words.</p>
+
+  <div class="grid">
+    <div>
+      <div class="muted">Text A</div>
+      <textarea id="textA" placeholder="Colle ton premier texte ici..."></textarea>
+    </div>
+    <div>
+      <div class="muted">Text B</div>
+      <textarea id="textB" placeholder="Colle ton deuxième texte ici..."></textarea>
+    </div>
+  </div>
+
+  <div class="row">
+    <button id="btn">Compare</button>
+    <span id="status" class="muted"></span>
+  </div>
+
+  <div class="card">
+    <div class="kpi">
+      <div><b>Jaccard (words)</b><div id="jaccard" class="muted">—</div></div>
+      <div><b>Cosinus TF-IDF</b><div id="cosine" class="muted">—</div></div>
+    </div>
+    <div style="margin-top:10px">
+      <b>Top common terms</b>
+      <div id="terms" class="muted">—</div>
+      <div id="counts" class="muted small" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:12px">
+    <div class="card">
+      <b>A highlighted</b>
+      <div id="prevA" class="preview muted" style="margin-top:8px">—</div>
+    </div>
+    <div class="card">
+      <b>B highlighted</b>
+      <div id="prevB" class="preview muted" style="margin-top:8px">—</div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function escapeHtml(s) {
+    return s
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function highlight(text, tokens) {
+    if (!text) return "—";
+    const safe = escapeHtml(text);
+    // we limit highlighting to "interesting" tokens
+    const filtered = tokens
+      .filter(t => t.length >= 4) // avoid to highlight "de", "le", etc
+      .slice(0, 120);
+
+    if (filtered.length === 0) return safe;
+
+    // we build a "word" regex (with accents) based on the returned tokens
+    // attention: regex on HTML-escaped text -> OK because tokens are only letters/digits/' (no special HTML chars)
+    const escapedTokens = filtered.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const re = new RegExp("\\b(" + escapedTokens.join("|") + ")\\b", "gi");
+
+    return safe.replace(re, "<mark>$1</mark>");
+  }
+
+  function pct(x) {
+    const v = Math.round(x * 1000) / 10; // 1 décimal
+    return v.toFixed(1) + "%";
+  }
+
+  $("btn").addEventListener("click", async () => {
+    const textA = $("textA").value;
+    const textB = $("textB").value;
+
+    $("status").textContent = "Comparaison en cours...";
+    $("btn").disabled = true;
+
+    try {
+      const res = await fetch("/api/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ textA, textB })
+      });
+
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+
+      $("jaccard").textContent = pct(data.jaccard);
+      $("cosine").textContent = pct(data.cosine_tfidf);
+
+      $("terms").textContent = (data.top_common_terms && data.top_common_terms.length)
+        ? data.top_common_terms.join(", ")
+        : "—";
+
+      const c = data.counts || {};
+      $("counts").textContent =
+        `tokensA=${c.tokensA ?? "?"}, tokensB=${c.tokensB ?? "?"}, uniquesA=${c.uniqueA ?? "?"}, uniquesB=${c.uniqueB ?? "?"}, communs=${c.common_unique ?? "?"}`;
+
+      const tokens = data.common_tokens_sample || [];
+      $("prevA").innerHTML = highlight(textA, tokens);
+      $("prevB").innerHTML = highlight(textB, tokens);
+
+      $("status").textContent = "OK";
+    } catch (e) {
+      $("status").textContent = "Erreur: " + e.message;
+    } finally {
+      $("btn").disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
