@@ -28,11 +28,11 @@
   <div class="grid">
     <div>
       <div class="muted">Text A</div>
-      <textarea id="textA" placeholder="Colle ton premier texte ici..."></textarea>
+      <textarea id="textA" placeholder="Paste your first text here..."></textarea>
     </div>
     <div>
       <div class="muted">Text B</div>
-      <textarea id="textB" placeholder="Colle ton deuxième texte ici..."></textarea>
+      <textarea id="textB" placeholder="Paste your second text here..."></textarea>
     </div>
   </div>
 
@@ -103,7 +103,7 @@
     const textA = $("textA").value;
     const textB = $("textB").value;
 
-    $("status").textContent = "Comparaison en cours...";
+    $("status").textContent = "Comparing...";
     $("btn").disabled = true;
 
     try {
@@ -133,7 +133,7 @@
 
       $("status").textContent = "OK";
     } catch (e) {
-      $("status").textContent = "Erreur: " + e.message;
+      $("status").textContent = "Error: " + e.message;
     } finally {
       $("btn").disabled = false;
     }
