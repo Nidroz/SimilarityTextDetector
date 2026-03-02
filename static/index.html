@@ -4,68 +4,547 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Similarity Detector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; max-width: 1100px; }
-    h1 { margin: 0 0 12px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    textarea { width: 100%; height: 220px; padding: 10px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px; }
-    button { padding: 10px 14px; border: 0; border-radius: 10px; cursor: pointer; font-weight: 600; }
-    .row { display: flex; gap: 10px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
-    .card { border: 1px solid #eee; border-radius: 12px; padding: 12px; }
-    .kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .kpi div { padding: 10px; border: 1px solid #f0f0f0; border-radius: 10px; }
-    .muted { color: #666; font-size: 13px; }
-    mark { padding: 0 2px; border-radius: 4px; }
-    .preview { white-space: pre-wrap; line-height: 1.45; }
-    .small { font-size: 12px; }
-    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    :root {
+      --bg: #0b0c0f;
+      --surface: #13151a;
+      --border: #222530;
+      --border-bright: #2e3347;
+      --accent: #7ef08a;
+      --accent-dim: rgba(126, 240, 138, 0.12);
+      --accent-glow: rgba(126, 240, 138, 0.35);
+      --text: #e8eaf0;
+      --muted: #5a5f75;
+      --muted-mid: #8a8fa8;
+      --danger: #ff6b6b;
+      --blue: #6eb5ff;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 24px 80px;
+    }
+
+    /* background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    /* header */
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 48px;
+    }
+
+    .logo-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid rgba(126, 240, 138, 0.25);
+      padding: 3px 10px;
+      border-radius: 4px;
+      width: fit-content;
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .header-meta {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: right;
+      line-height: 1.8;
+      margin-top: 4px;
+    }
+
+    /* editor grid */
+    .editor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .editor-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .editor-panel:focus-within {
+      border-color: var(--border-bright);
+      box-shadow: 0 0 0 1px var(--border-bright);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .panel-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted-mid);
+    }
+
+    .char-count {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      height: 200px;
+      padding: 14px;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: vertical;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      caret-color: var(--accent);
+    }
+
+    textarea::placeholder { color: var(--muted); }
+
+    /* controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .btn-compare {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 24px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s, box-shadow 0.2s;
+      letter-spacing: 0.01em;
+    }
+
+    .btn-compare:hover { opacity: 0.9; box-shadow: 0 0 20px var(--accent-glow); }
+    .btn-compare:active { transform: scale(0.97); }
+    .btn-compare:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .btn-compare.loading svg { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .btn-clear {
+      padding: 10px 18px;
+      background: transparent;
+      color: var(--muted-mid);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-clear:hover { border-color: var(--border-bright); color: var(--text); }
+
+    #status { font-size: 12px; color: var(--muted); margin-left: auto; }
+    #status.error { color: var(--danger); }
+    #status.ok { color: var(--accent); }
+
+    /* results */
+    .results {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .results.visible { opacity: 1; transform: translateY(0); }
+
+    .score-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .score-card::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      transform: scaleX(0);
+      transform-origin: center;
+      transition: transform 0.5s ease 0.2s;
+    }
+
+    .results.visible .score-card::before { transform: scaleX(1); }
+
+    .score-label {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .score-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 42px;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .score-value.low { color: var(--danger); }
+    .score-value.mid { color: var(--blue); }
+
+    .score-desc {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .gauge {
+      margin-top: 10px;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .gauge-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--accent);
+      width: 0;
+      transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.3s;
+    }
+
+    /* bottom row */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 16px;
+      margin-bottom: 16px;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.4s ease 0.1s, transform 0.4s ease 0.1s;
+    }
+
+    .bottom-row.visible { opacity: 1; transform: translateY(0); }
+
+    .stats-card, .terms-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+
+    .card-title {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .stat-row:last-child { border-bottom: none; }
+    .stat-key { color: var(--muted-mid); }
+    .stat-val { color: var(--text); font-weight: 500; }
+
+    .terms-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .term-tag {
+      font-size: 12px;
+      padding: 4px 10px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(126, 240, 138, 0.2);
+      border-radius: 6px;
+      color: var(--accent);
+      opacity: 0;
+      transform: scale(0.9);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .results.visible ~ .bottom-row .term-tag,
+    .bottom-row.visible .term-tag { opacity: 1; transform: scale(1); }
+
+    /* highlight panels */
+    .hl-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.4s ease 0.2s, transform 0.4s ease 0.2s;
+    }
+
+    .hl-grid.visible { opacity: 1; transform: translateY(0); }
+
+    .hl-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .hl-panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .hl-panel-header .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    .hl-panel-header span {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted-mid);
+    }
+
+    .hl-content {
+      padding: 14px;
+      font-size: 13px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      color: var(--muted-mid);
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .hl-content::-webkit-scrollbar { width: 4px; }
+    .hl-content::-webkit-scrollbar-track { background: transparent; }
+    .hl-content::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+    mark {
+      background: var(--accent-dim);
+      color: var(--accent);
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+
+    .placeholder-text { color: var(--muted); font-style: italic; }
+
+    @media (max-width: 700px) {
+      .editor-grid, .results, .bottom-row, .hl-grid { grid-template-columns: 1fr; }
+      header { flex-direction: column; gap: 16px; }
+      .header-meta { text-align: left; }
+      h1 { font-size: 30px; }
+    }
   </style>
 </head>
 <body>
-  <h1>Similarity Detector (Jaccard + TF-IDF)</h1>
-  <p class="muted">Paste two texts, click Compare, then check the scores and the highlighted common words.</p>
+  <div class="wrapper">
 
-  <div class="grid">
-    <div>
-      <div class="muted">Text A</div>
-      <textarea id="textA" placeholder="Paste your first text here..."></textarea>
-    </div>
-    <div>
-      <div class="muted">Text B</div>
-      <textarea id="textB" placeholder="Paste your second text here..."></textarea>
-    </div>
-  </div>
+    <header>
+      <div class="logo-group">
+        <div class="badge">v1.0 · NLP</div>
+        <h1>Similarity<br><span>Detector</span></h1>
+        <p class="subtitle">Jaccard + TF-IDF cosine similarity</p>
+      </div>
+      <div class="header-meta">
+        Paste two texts below<br>and click Compare
+      </div>
+    </header>
 
-  <div class="row">
-    <button id="btn">Compare</button>
-    <span id="status" class="muted"></span>
-  </div>
+    <div class="editor-grid">
+      <div class="editor-panel">
+        <div class="panel-header">
+          <span class="panel-label">Text A</span>
+          <span class="char-count" id="ccA">0 chars</span>
+        </div>
+        <textarea id="textA" placeholder="Paste your first text here..."></textarea>
+      </div>
+      <div class="editor-panel">
+        <div class="panel-header">
+          <span class="panel-label">Text B</span>
+          <span class="char-count" id="ccB">0 chars</span>
+        </div>
+        <textarea id="textB" placeholder="Paste your second text here..."></textarea>
+      </div>
+    </div>
 
-  <div class="card">
-    <div class="kpi">
-      <div><b>Jaccard (words)</b><div id="jaccard" class="muted">—</div></div>
-      <div><b>Cosinus TF-IDF</b><div id="cosine" class="muted">—</div></div>
+    <div class="controls">
+      <button class="btn-compare" id="btn">
+        <svg id="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+        Compare
+      </button>
+      <button class="btn-clear" id="clearBtn">Clear</button>
+      <span id="status"></span>
     </div>
-    <div style="margin-top:10px">
-      <b>Top common terms</b>
-      <div id="terms" class="muted">—</div>
-      <div id="counts" class="muted small" style="margin-top:6px"></div>
-    </div>
-  </div>
 
-  <div class="grid" style="margin-top:12px">
-    <div class="card">
-      <b>A highlighted</b>
-      <div id="prevA" class="preview muted" style="margin-top:8px">—</div>
+    <div class="results" id="results">
+      <div class="score-card">
+        <div class="score-label">Jaccard (words)</div>
+        <div class="score-value" id="jaccard">—</div>
+        <div class="score-desc">Set intersection / union of unique tokens</div>
+        <div class="gauge"><div class="gauge-fill" id="gJaccard"></div></div>
+      </div>
+      <div class="score-card">
+        <div class="score-label">Cosine TF-IDF</div>
+        <div class="score-value" id="cosine">—</div>
+        <div class="score-desc">Weighted frequency similarity (unigrams + bigrams)</div>
+        <div class="gauge"><div class="gauge-fill" id="gCosine"></div></div>
+      </div>
     </div>
-    <div class="card">
-      <b>B highlighted</b>
-      <div id="prevB" class="preview muted" style="margin-top:8px">—</div>
+
+    <div class="bottom-row" id="bottomRow">
+      <div class="stats-card">
+        <div class="card-title">Token counts</div>
+        <div class="stat-row"><span class="stat-key">Tokens A</span><span class="stat-val" id="sTA">—</span></div>
+        <div class="stat-row"><span class="stat-key">Tokens B</span><span class="stat-val" id="sTB">—</span></div>
+        <div class="stat-row"><span class="stat-key">Unique A</span><span class="stat-val" id="sUA">—</span></div>
+        <div class="stat-row"><span class="stat-key">Unique B</span><span class="stat-val" id="sUB">—</span></div>
+        <div class="stat-row"><span class="stat-key">Common unique</span><span class="stat-val" id="sCom">—</span></div>
+      </div>
+      <div class="terms-card">
+        <div class="card-title">Top common terms</div>
+        <div class="terms-list" id="termsList">
+          <span class="placeholder-text">Run a comparison first</span>
+        </div>
+      </div>
     </div>
+
+    <div class="hl-grid" id="hlGrid">
+      <div class="hl-panel">
+        <div class="hl-panel-header">
+          <div class="dot"></div>
+          <span>Text A — highlighted</span>
+        </div>
+        <div class="hl-content placeholder-text" id="prevA">Highlights will appear here after comparison.</div>
+      </div>
+      <div class="hl-panel">
+        <div class="hl-panel-header">
+          <div class="dot"></div>
+          <span>Text B — highlighted</span>
+        </div>
+        <div class="hl-content placeholder-text" id="prevB">Highlights will appear here after comparison.</div>
+      </div>
+    </div>
+
   </div>
 
 <script>
   const $ = (id) => document.getElementById(id);
+
+  // update char counts on input
+  ["textA", "textB"].forEach((id, i) => {
+    const el = $(id);
+    const cc = $(["ccA","ccB"][i]);
+    el.addEventListener("input", () => {
+      cc.textContent = el.value.length.toLocaleString() + " chars";
+    });
+  });
+
+  $("clearBtn").addEventListener("click", () => {
+    $("textA").value = "";
+    $("textB").value = "";
+    $("ccA").textContent = "0 chars";
+    $("ccB").textContent = "0 chars";
+    ["results","bottomRow","hlGrid"].forEach(id => $(id).classList.remove("visible"));
+    $("status").textContent = "";
+    $("status").className = "";
+  });
 
   function escapeHtml(s) {
     return s
@@ -77,34 +556,47 @@
   }
 
   function highlight(text, tokens) {
-    if (!text) return "—";
+    if (!text) return '<span class="placeholder-text">—</span>';
     const safe = escapeHtml(text);
-    // we limit highlighting to "interesting" tokens
-    const filtered = tokens
-      .filter(t => t.length >= 4) // avoid to highlight "de", "le", etc
-      .slice(0, 120);
-
-    if (filtered.length === 0) return safe;
-
-    // we build a "word" regex (with accents) based on the returned tokens
-    // attention: regex on HTML-escaped text -> OK because tokens are only letters/digits/' (no special HTML chars)
-    const escapedTokens = filtered.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    const re = new RegExp("\\b(" + escapedTokens.join("|") + ")\\b", "gi");
-
+    const filtered = tokens.filter(t => t.length >= 4).slice(0, 120);
+    if (!filtered.length) return safe;
+    const escaped = filtered.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const re = new RegExp("\\b(" + escaped.join("|") + ")\\b", "gi");
     return safe.replace(re, "<mark>$1</mark>");
   }
 
   function pct(x) {
-    const v = Math.round(x * 1000) / 10; // 1 décimal
-    return v.toFixed(1) + "%";
+    return (Math.round(x * 1000) / 10).toFixed(1) + "%";
+  }
+
+  function scoreClass(x) {
+    if (x < 0.25) return "low";
+    if (x < 0.55) return "mid";
+    return "";
+  }
+
+  function setScore(elId, gaugeId, value) {
+    const el = $(elId);
+    el.textContent = pct(value);
+    el.className = "score-value " + scoreClass(value);
+    setTimeout(() => { $(gaugeId).style.width = (value * 100) + "%"; }, 50);
   }
 
   $("btn").addEventListener("click", async () => {
     const textA = $("textA").value;
     const textB = $("textB").value;
 
-    $("status").textContent = "Comparing...";
-    $("btn").disabled = true;
+    const statusEl = $("status");
+    const btnEl = $("btn");
+    const iconEl = $("btn-icon");
+
+    statusEl.textContent = "Comparing…";
+    statusEl.className = "";
+    btnEl.disabled = true;
+    btnEl.classList.add("loading");
+
+    // swap to spinner icon
+    iconEl.innerHTML = '<circle cx="12" cy="12" r="9" stroke-dasharray="50" stroke-dashoffset="25"/>';
 
     try {
       const res = await fetch("/api/compare", {
@@ -116,26 +608,46 @@
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
 
-      $("jaccard").textContent = pct(data.jaccard);
-      $("cosine").textContent = pct(data.cosine_tfidf);
-
-      $("terms").textContent = (data.top_common_terms && data.top_common_terms.length)
-        ? data.top_common_terms.join(", ")
-        : "—";
+      setScore("jaccard", "gJaccard", data.jaccard);
+      setScore("cosine", "gCosine", data.cosine_tfidf);
 
       const c = data.counts || {};
-      $("counts").textContent =
-        `tokensA=${c.tokensA ?? "?"}, tokensB=${c.tokensB ?? "?"}, uniquesA=${c.uniqueA ?? "?"}, uniquesB=${c.uniqueB ?? "?"}, communs=${c.common_unique ?? "?"}`;
+      $("sTA").textContent = (c.tokensA ?? "?").toLocaleString();
+      $("sTB").textContent = (c.tokensB ?? "?").toLocaleString();
+      $("sUA").textContent = (c.uniqueA ?? "?").toLocaleString();
+      $("sUB").textContent = (c.uniqueB ?? "?").toLocaleString();
+      $("sCom").textContent = (c.common_unique ?? "?").toLocaleString();
+
+      const termsList = $("termsList");
+      const terms = data.top_common_terms || [];
+      if (terms.length) {
+        termsList.innerHTML = terms
+          .map((t, i) => `<span class="term-tag" style="transition-delay:${0.05 + i * 0.04}s">${escapeHtml(t)}</span>`)
+          .join("");
+      } else {
+        termsList.innerHTML = '<span class="placeholder-text">No common terms found</span>';
+      }
 
       const tokens = data.common_tokens_sample || [];
-      $("prevA").innerHTML = highlight(textA, tokens);
-      $("prevB").innerHTML = highlight(textB, tokens);
+      const prevA = $("prevA");
+      const prevB = $("prevB");
+      prevA.className = "hl-content";
+      prevB.className = "hl-content";
+      prevA.innerHTML = highlight(textA, tokens);
+      prevB.innerHTML = highlight(textB, tokens);
 
-      $("status").textContent = "OK";
+      ["results","bottomRow","hlGrid"].forEach(id => $(id).classList.add("visible"));
+
+      statusEl.textContent = "Done ✓";
+      statusEl.className = "ok";
     } catch (e) {
-      $("status").textContent = "Error: " + e.message;
+      statusEl.textContent = "Error: " + e.message;
+      statusEl.className = "error";
     } finally {
-      $("btn").disabled = false;
+      btnEl.disabled = false;
+      btnEl.classList.remove("loading");
+      // restore arrow icon
+      iconEl.innerHTML = '<path d="M5 12h14M12 5l7 7-7 7"/>';
     }
   });
 </script>
