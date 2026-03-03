@@ -14,9 +14,28 @@ STATIC_DIR = ROOT / "static"
 TOKEN_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ0-9']+", re.UNICODE)
 
 def tokenize(text: str) -> list[str]:
+    """extract all word tokens from a text string.
+
+    uses a unicode-aware regex to capture words including accented characters
+    and apostrophes. all tokens are lowercased.
+
+    args:
+        text: the raw input string to tokenize.
+
+    returns:
+        a list of lowercase token strings.
+    """
     return TOKEN_RE.findall(text.lower())
 
 def safe_round(text_number: float):
+    """safely round a float to 4 decimal places, handling nan and inf.
+
+    args:
+        text_number: the float value to round.
+
+    returns:
+        the rounded float, or 0.0 if the value is nan or infinite.
+    """
     try:
         if math.isnan(text_number) or math.isinf(text_number):
             return 0.0
@@ -27,6 +46,11 @@ def safe_round(text_number: float):
     
 ### SCORES ###
 def jaccard_similarity(tokens1: list[str], tokens2: list[str]) -> float:
+    """compute the jaccard similarity between two token lists.
+
+    jaccard similarity is defined as the size of the intersection divided
+    by the size of the union of the two token sets.
+    """
     set1 = set(tokens1)
     set2 = set(tokens2)
     if not set1 and not set2:
@@ -37,6 +61,11 @@ def jaccard_similarity(tokens1: list[str], tokens2: list[str]) -> float:
     return len(set1 & set2) / len(set1 | set2)
 
 def cosine_tfidf(text1: str, text2: str) -> float:
+    """compute the cosine similarity between two texts using TF-IDF vectors.
+
+    fits a TF-IDF vectorizer on both texts using unigrams and bigrams,
+    then returns the cosine similarity between the two resulting vectors.
+    """
     vect = TfidfVectorizer(
         lowercase=True,
         token_pattern=r"(?u)[A-Za-zÀ-ÖØ-öø-ÿ0-9']+",    # (?u) for unicode support
